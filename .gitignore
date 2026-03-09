@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
+test_rankings.csv
+test_signups.txt
+.env
