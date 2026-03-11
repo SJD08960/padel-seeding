@@ -1,4 +1,8 @@
 import csv
+import json
+import re
+import urllib.error
+import urllib.request
 from datetime import datetime
 
 
@@ -66,6 +70,34 @@ def parse_rankings(filepath: str) -> tuple[dict, list]:
                 display_names[name.lower()] = name
 
     return rankings, tournaments, display_names
+
+
+def fetch_playtomic_signups(url_or_id: str) -> list[str]:
+    """
+    Fetch signed-up player names from a Playtomic tournament URL or ID.
+    Returns a list of full_name strings in registration order.
+    """
+    uuid_pattern = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    match = re.search(uuid_pattern, url_or_id, re.IGNORECASE)
+    if not match:
+        raise ValueError(f"Could not find a tournament ID in: {url_or_id!r}")
+    tournament_id = match.group(0)
+
+    url = f"https://api.playtomic.io/v1/tournaments/{tournament_id}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Playtomic API error {e.code}: {e.reason}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Network error: {e.reason}") from e
+
+    players = data.get("registered_players") or []
+    names = [p["full_name"] for p in players if p.get("full_name")]
+    if not names:
+        raise ValueError("No registered players found in this tournament.")
+    return names
 
 
 def parse_signups(filepath: str) -> list[str]:

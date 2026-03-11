@@ -4,7 +4,7 @@ import sys
 from rich.console import Console
 from rich.rule import Rule
 
-from parser import parse_rankings, parse_signups
+from parser import parse_rankings, parse_signups, fetch_playtomic_signups
 from algorithm import compute_seeding
 from display import render_seeding, save_csv
 
@@ -21,7 +21,13 @@ def main():
     )
     parser.add_argument(
         "signups_txt",
+        nargs="?",
         help="Text file with one signed-up player name per line",
+    )
+    parser.add_argument(
+        "--playtomic",
+        metavar="URL_OR_ID",
+        help="Fetch signups directly from a Playtomic tournament URL or ID",
     )
     parser.add_argument(
         "--output",
@@ -29,6 +35,9 @@ def main():
         help="Optional: save results to a CSV file",
     )
     args = parser.parse_args()
+
+    if not args.signups_txt and not args.playtomic:
+        parser.error("Provide either a signups file or --playtomic URL/ID.")
 
     console.print(Rule("[bold cyan]Padel Tournament Seeder[/bold cyan]"))
     console.print()
@@ -50,12 +59,20 @@ def main():
     console.print()
 
     # --- Load signups ---
-    console.print(f"[dim]Loading signups from:[/dim] [white]{args.signups_txt}[/white]")
-    try:
-        signups = parse_signups(args.signups_txt)
-    except Exception as e:
-        console.print(f"[red]Error reading signup file:[/red] {e}")
-        sys.exit(1)
+    if args.playtomic:
+        console.print(f"[dim]Fetching signups from Playtomic:[/dim] [white]{args.playtomic}[/white]")
+        try:
+            signups = fetch_playtomic_signups(args.playtomic)
+        except Exception as e:
+            console.print(f"[red]Error fetching from Playtomic:[/red] {e}")
+            sys.exit(1)
+    else:
+        console.print(f"[dim]Loading signups from:[/dim] [white]{args.signups_txt}[/white]")
+        try:
+            signups = parse_signups(args.signups_txt)
+        except Exception as e:
+            console.print(f"[red]Error reading signup file:[/red] {e}")
+            sys.exit(1)
 
     if not signups:
         console.print("[red]Signup list is empty.[/red]")
